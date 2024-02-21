@@ -161,9 +161,6 @@ def show_bar_chart(num_elements_set_1, num_elements_set_2):
     st.pyplot(fig)
     st.write('This chart shows a comparison between the number of positive and negative reviews based on their occurrence.')
 
-import matplotlib.pyplot as plt
-import streamlit as st
-
 def rating_prediction(positivity):
     normalized_scores = [(score * 4) + 1 for score in (positivity)]
     average_score = sum(normalized_scores) / len(normalized_scores)
