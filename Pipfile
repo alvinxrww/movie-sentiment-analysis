@@ -4,6 +4,15 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
+nltk = "*"
+bs4 = "*"
+wordcloud = "*"
+transformers = "*"
+requests = "*"
+streamlit = "*"
+matplotlib = "*"
+altair = "*"
+pandas = "*"
 
 [dev-packages]
 

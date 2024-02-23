@@ -4,7 +4,7 @@ from wordcloud import WordCloud
 from transformers import pipeline
 from nltk.tokenize import word_tokenize
 from requests.exceptions import MissingSchema
-import nltk, requests, streamlit as st, matplotlib.pyplot as plt
+import nltk, requests, streamlit as st, matplotlib.pyplot as plt, altair as alt, pandas as pd
 
 def search_movie():
     # Create a text input for the search bar
@@ -83,70 +83,54 @@ def analyze_sentiment(text_to_analyze):
 
     return sentiment_result
 
-def get_coordinates(sentiment_result):
-    pos_x = []
-    pos_y = []
-    neg_x = []
-    neg_y = []
-    for dct in sentiment_result:
-        if dct['label'] == 'POSITIVE':
-            x = dct['score']
-            y = 1-x
-            pos_x.append(x)
-            pos_y.append(y)
+def get_df(sentences, sentiments):
+    x = []
+    y = []
+
+    for senti in sentiments:
+        score = senti['score']
+        if senti['label'] == 'NEGATIVE':
+            x.append(1-score)
+            y.append(score)
         else:
-            y = dct['score']
-            x = 1-y
-            neg_x.append(x)
-            neg_y.append(y)
-    
-    return [pos_x, pos_y, neg_x, neg_y]
+            x.append(score)
+            y.append(1-score)
+
+    sents = {
+        'review': sentences,
+        'score': [senti['score'] for senti in sentiments],
+        'label': [senti['label'] for senti in sentiments],
+        'sentiments': sentiments,
+        'positivity': x,
+        'negativity': y
+    }
+
+    df = pd.DataFrame(sents)
+    return df
 
 def generate_wordcloud(words):
     # Generate WordCloud for adjectives
     wordcloud = WordCloud(width=800, height=400, background_color='white').generate(words)
-    # Display the WordCloud using matplotlib
 
+    # Display the WordCloud using matplotlib
     fig, ax = plt.subplots(figsize=(10,5))
     ax.imshow(wordcloud, interpolation='bilinear')
     ax.axis('off')
+    st.subheader('Wordcloud')
     st.pyplot(fig)
     st.write('The figure above is a visual representation of the review data displayed in different sizes based on their frequency. The more frequent a word appears in the review, the larger and bolder it appears in the word cloud. This can be used to identify the most prominent and frequently mentioned terms. This wordcloud only displays adjectives as it allows the reader to focus on the descriptive elements and sentiments associated with the films.')
 
-def show_scatter_plot(coords):
-    pos_x, pos_y, neg_x, neg_y = coords[0], coords[1], coords[2], coords[3]
-    # Create a figure and axis
-    fig, ax = plt.subplots()
+def show_scatter_plot(df):
+    scatter = alt.Chart(df).mark_circle(size=60).encode(
+        x='positivity',
+        y='negativity',
+        color=alt.Color('label:N', scale=alt.Scale(domain=['POSITIVE', 'NEGATIVE'], range=['blue', 'red'])),
+        tooltip=['positivity', 'negativity', 'review']
+    ).interactive()
 
-    ax.scatter(pos_x, pos_y, color='blue', label='Positive Reviews', s=5)
-    ax.scatter(neg_x, neg_y, color='red', label='Negative Reviews', s=5)
-
-    ax.set_xlabel('Positive')
-    ax.set_ylabel('Negative')
-
-    # Customize the plot
-    ax.set_title('Reviews Tendency')
-    ax.legend()  # Show legend with labels
-
-    # Show the plot
-    st.pyplot(fig)
-    st.write('This plot shows the probability of each review sentence. The x-axis represents probability of a sentiment is positive, while y represents negative. For each review, if the value of x is greater than y, it will be classified as a positive review. Same goes the other way.')
-
-def show_bar_chart(num_elements_set_1, num_elements_set_2):
-    # Bar chart
-    fig, ax = plt.subplots()
-    ax.bar(['Positive', 'Negative'], [num_elements_set_1, num_elements_set_2], color=['blue', 'red'])
-
-    # Customize the plot
-    ax.set_title('Sentiments Comparison')
-    ax.set_ylabel('Number of Sentiments')
-
-    # Show the plot
-    st.pyplot(fig)
-    st.write('This chart shows a comparison between the number of positive and negative reviews based on their occurrence.')
-
-import matplotlib.pyplot as plt
-import streamlit as st
+    st.subheader('Sentiments Tendencies')
+    st.altair_chart(scatter, use_container_width=True)
+    st.write('This plot shows the probability of each review sentence. The x-axis represents the probability of a sentiment being positive, while y represents negative. For each review, if the value of x is greater than y, it will be classified as a positive review. The plot uses blue color for positive reviews and red color for negative reviews.')
 
 def show_pie_chart(num_elements_set_1, num_elements_set_2):
     # Pie chart
@@ -164,8 +148,21 @@ def show_pie_chart(num_elements_set_1, num_elements_set_2):
     st.pyplot(fig)
     st.write('This chart shows a comparison between the number of positive and negative reviews by percentage.')
 
-def rating_prediction(pos_x, neg_x):
-    normalized_scores = [(score * 4) + 1 for score in (pos_x + neg_x)]
+def show_bar_chart(num_elements_set_1, num_elements_set_2):
+    # Bar chart
+    fig, ax = plt.subplots()
+    ax.bar(['Positive', 'Negative'], [num_elements_set_1, num_elements_set_2], color=['blue', 'red'])
+
+    # Customize the plot
+    ax.set_title('Sentiments Comparison')
+    ax.set_ylabel('Number of Sentiments')
+
+    # Show the plot
+    st.pyplot(fig)
+    st.write('This chart shows a comparison between the number of positive and negative reviews based on their occurrence.')
+
+def rating_prediction(positivity):
+    normalized_scores = [(score * 4) + 1 for score in (positivity)]
     average_score = sum(normalized_scores) / len(normalized_scores)
     rating = f'Rating prediction: {average_score:.2f}/5⭐'
     caption = 'The rating above is calculated by normalizing each review\'s probability (tendency of either positive or negative) into the scale of 1 to 5, then taking their average.'
@@ -179,18 +176,18 @@ def display_analysis(sentences):
         return
     
     text = ' '.join(sentences)
-    critics_sentiment = analyze_sentiment(sentences)
-    critics_coords = get_coordinates(critics_sentiment)
-    pos_x, neg_x = critics_coords[0], critics_coords[2]
-    poss, negs = len(pos_x), len(neg_x)
-    
-    rating_prediction(pos_x, neg_x)
+    sentiments = analyze_sentiment(sentences)
+    df = get_df(sentences, sentiments)
+    label_count = df['label'].value_counts()
+    poss = label_count['POSITIVE']
+    negs = label_count['NEGATIVE']
 
+    rating_prediction(df['positivity'])
     wordcloud, scatter, pie, bar = st.tabs(['Overview', 'Senti-plot', 'Percentage', 'Comparisson'])
     with wordcloud:    
         generate_wordcloud(extract_adj(text))
     with scatter:
-        show_scatter_plot(critics_coords)
+        show_scatter_plot(df)
     with pie:
         show_pie_chart(poss, negs)
     with bar:
