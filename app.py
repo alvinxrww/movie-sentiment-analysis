@@ -68,6 +68,7 @@ def extract_adj(text):
 
     # Join adjectives into a single string
     all_adjectives = ' '.join(adjectives)
+
     return all_adjectives
 
 def analyze_sentiment(text_to_analyze):
@@ -132,10 +133,10 @@ def show_scatter_plot(df):
     st.altair_chart(scatter, use_container_width=True)
     st.write('This plot shows the probability of each review sentence. The x-axis represents the probability of a sentiment being positive, while y represents negative. For each review, if the value of x is greater than y, it will be classified as a positive review. The plot uses blue color for positive reviews and red color for negative reviews.')
 
-def show_pie_chart(num_elements_set_1, num_elements_set_2):
+def show_pie_chart(poss, negs):
     # Pie chart
     labels = ['Positive', 'Negative']
-    sizes = [num_elements_set_1, num_elements_set_2]
+    sizes = [poss, negs]
     colors = ['blue', 'red']
 
     fig, ax = plt.subplots()
@@ -148,10 +149,10 @@ def show_pie_chart(num_elements_set_1, num_elements_set_2):
     st.pyplot(fig)
     st.write('This chart shows a comparison between the number of positive and negative reviews by percentage.')
 
-def show_bar_chart(num_elements_set_1, num_elements_set_2):
+def show_bar_chart(poss, negs):
     # Bar chart
     fig, ax = plt.subplots()
-    ax.bar(['Positive', 'Negative'], [num_elements_set_1, num_elements_set_2], color=['blue', 'red'])
+    ax.bar(['Positive', 'Negative'], [poss, negs], color=['blue', 'red'])
 
     # Customize the plot
     ax.set_title('Sentiments Comparison')
@@ -165,7 +166,7 @@ def rating_prediction(positivity):
     normalized_scores = [(score * 4) + 1 for score in (positivity)]
     average_score = sum(normalized_scores) / len(normalized_scores)
     rating = f'Rating prediction: {average_score:.2f}/5⭐'
-    caption = 'The rating above is calculated by normalizing each review\'s probability (tendency of either positive or negative) into the scale of 1 to 5, then taking their average.'
+    caption = 'The rating above is calculated by normalizing each review\'s positivity (probability of being a positive review) into the scale of 1 to 5, then taking their average.'
 
     st.subheader(rating)
     st.write(caption)
@@ -179,11 +180,11 @@ def display_analysis(sentences):
     sentiments = analyze_sentiment(sentences)
     df = get_df(sentences, sentiments)
     label_count = df['label'].value_counts()
-    poss = label_count['POSITIVE']
-    negs = label_count['NEGATIVE']
+    poss = label_count.get('POSITIVE')
+    negs = label_count.get('NEGATIVE')
 
     rating_prediction(df['positivity'])
-    wordcloud, scatter, pie, bar = st.tabs(['Overview', 'Senti-plot', 'Percentage', 'Comparisson'])
+    wordcloud, scatter, pie, bar = st.tabs(['Overview', 'Senti-plot', 'Distribution', 'Comparison'])
     with wordcloud:    
         generate_wordcloud(extract_adj(text))
     with scatter:
