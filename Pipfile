@@ -15,6 +15,7 @@ altair = "*"
 pandas = "*"
 numpy = "*"
 importlib-resources = "*"
+tensorflow = "*"
 
 [dev-packages]
 
