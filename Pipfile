@@ -13,6 +13,7 @@ streamlit = "*"
 matplotlib = "*"
 altair = "*"
 pandas = "*"
+numpy = "*"
 
 [dev-packages]
 
