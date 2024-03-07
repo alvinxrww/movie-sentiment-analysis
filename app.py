@@ -220,10 +220,18 @@ def show_pie_chart(poss, negs):
 def rating_prediction(positivity):
     normalized_scores = [(score * 4) + 1 for score in (positivity)]
     average_score = sum(normalized_scores) / len(normalized_scores)
-    rating = f'Rating prediction: {average_score:.2f}/5⭐'
-    caption = 'The rating above is calculated by normalizing each review\'s positivity (probability of being a positive review) into the scale of 1 to 5, then taking their average.'
-
+    rating = f'Average rating: {average_score:.2f}/5⭐'
+    caption = 'The rating above is calculated by normalizing each review\'s positivity (probability of being a positive review) into the scale of 1 to 5.'
+    
+    source = pd.DataFrame({
+        "score": normalized_scores
+    })
+    scores_chart = alt.Chart(source).mark_bar().encode(
+        alt.X("score:Q", title="Ratings", bin=True),
+        y='count()',
+    )
     st.subheader(rating)
+    st.altair_chart(scores_chart)
     st.write(caption)
 
 def display_analysis(sentences):
