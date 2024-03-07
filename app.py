@@ -1,10 +1,22 @@
+import pandas as pd
+import altair as alt
+import nltk, requests
+import streamlit as st
 from nltk import pos_tag
 from bs4 import BeautifulSoup
+import matplotlib.pyplot as plt
 from wordcloud import WordCloud
+from nltk.corpus import stopwords
 from transformers import pipeline
+from gensim import corpora, models
 from nltk.tokenize import word_tokenize
 from requests.exceptions import MissingSchema
-import nltk, requests, streamlit as st, matplotlib.pyplot as plt, altair as alt, pandas as pd
+
+PARSER = "html.parser"
+nltk.download('punkt')
+nltk.download('wordnet')
+nltk.download('stopwords')
+nltk.download('averaged_perceptron_tagger')
 
 def search_movie():
     # Create a text input for the search bar
@@ -17,7 +29,7 @@ def search_movie():
     return response
 
 def show_suggestions(response):
-    soup = BeautifulSoup(response.content, 'html.parser')
+    soup = BeautifulSoup(response.content, PARSER)
     search_result_elements = soup.find('search-page-result', attrs={'type': 'movie', 'data-qa': 'search-result'})
     property_elements = search_result_elements.find_all('a', class_='unset', attrs={'data-qa': 'info-name', 'slot': 'title'})
     titles_urls = [(e.get('href'), e.text.strip()) for e in property_elements]
@@ -33,7 +45,7 @@ def pick_suggestion(suggestions):
 
 def get_reviews(url):
     response = requests.get(url)
-    soup = BeautifulSoup(response.content, 'html.parser')
+    soup = BeautifulSoup(response.content, PARSER)
 
     # Find all div review elements
     property_elements = soup.find_all('p', class_="audience-reviews__review js-review-text")
@@ -55,21 +67,42 @@ def get_critics(url):
 
     return reviews_text
 
-def extract_adj(text):
-    nltk.download('punkt')
-    nltk.download('averaged_perceptron_tagger')
+def preprocess_text(text):
+    stop_words = set(stopwords.words('english'))
 
+    tokens = word_tokenize(text.lower())
+    tokens = [token for token in tokens if token.isalpha() and token not in stop_words]
+    return tokens
+
+def extract_adj(text):
     # Tokenize and perform part-of-speech tagging
-    tokens = word_tokenize(text)
+    tokens = preprocess_text(text)
     pos_tags = pos_tag(tokens)
 
     # Extract adjectives
-    adjectives = [word for word, pos in pos_tags if pos.startswith('JJ') or pos.startswith('JJR') or pos.startswith('JJS')]
+    adjectives = [
+        word for word, pos in pos_tags 
+        if pos.startswith('JJ') 
+        or pos.startswith('JJR') 
+        or pos.startswith('JJS')
+    ]
 
     # Join adjectives into a single string
     all_adjectives = ' '.join(adjectives)
 
     return all_adjectives
+
+def generate_wordcloud(words):
+    # Generate WordCloud for adjectives
+    wordcloud = WordCloud(width=800, height=400, background_color='white').generate(words)
+
+    # Display the WordCloud using matplotlib
+    fig, ax = plt.subplots(figsize=(10,5))
+    ax.imshow(wordcloud, interpolation='bilinear')
+    ax.axis('off')
+    st.subheader('Wordcloud')
+    st.pyplot(fig)
+    st.write('The figure above is a visual representation of the review data displayed in different sizes based on their frequency. The more frequent a word appears in the review, the larger and bolder it appears in the word cloud. This can be used to identify the most prominent and frequently mentioned terms. This wordcloud only displays adjectives as it allows the reader to focus on the descriptive elements and sentiments associated with the films.')
 
 def analyze_sentiment(text_to_analyze):
     # Specify the model and revision explicitly
@@ -84,7 +117,7 @@ def analyze_sentiment(text_to_analyze):
 
     return sentiment_result
 
-def get_df(sentences, sentiments):
+def get_senti_df(sentences, sentiments):
     x = []
     y = []
 
@@ -109,19 +142,7 @@ def get_df(sentences, sentiments):
     df = pd.DataFrame(sents)
     return df
 
-def generate_wordcloud(words):
-    # Generate WordCloud for adjectives
-    wordcloud = WordCloud(width=800, height=400, background_color='white').generate(words)
-
-    # Display the WordCloud using matplotlib
-    fig, ax = plt.subplots(figsize=(10,5))
-    ax.imshow(wordcloud, interpolation='bilinear')
-    ax.axis('off')
-    st.subheader('Wordcloud')
-    st.pyplot(fig)
-    st.write('The figure above is a visual representation of the review data displayed in different sizes based on their frequency. The more frequent a word appears in the review, the larger and bolder it appears in the word cloud. This can be used to identify the most prominent and frequently mentioned terms. This wordcloud only displays adjectives as it allows the reader to focus on the descriptive elements and sentiments associated with the films.')
-
-def show_scatter_plot(df):
+def senti_plot(df):
     scatter = alt.Chart(df).mark_circle(size=60).encode(
         x='positivity',
         y='negativity',
@@ -132,6 +153,53 @@ def show_scatter_plot(df):
     st.subheader('Sentiments Tendencies')
     st.altair_chart(scatter, use_container_width=True)
     st.write('This plot shows the probability of each review sentence. The x-axis represents the probability of a sentiment being positive, while y represents negative. For each review, if the value of x is greater than y, it will be classified as a positive review. The plot uses blue color for positive reviews and red color for negative reviews.')
+
+def model_topics(reviews):
+    processed_reviews = [preprocess_text(review) for review in reviews]
+
+    dictionary = corpora.Dictionary(processed_reviews)
+    corpus = [dictionary.doc2bow(review) for review in processed_reviews]
+
+    lda_model = models.LdaModel(corpus, num_topics=10, id2word=dictionary, passes=15)
+    modelled_topics = lda_model.print_topics(num_words=2)
+
+    return modelled_topics
+
+def get_topics_df(modelled_topics):
+    numbers = []
+    scores = []
+    topics = []
+    for topic in modelled_topics:
+        number = topic[0]
+        top_weighted = topic[1].split("+")
+
+        score = top_weighted[0].split("*")[0]
+        top_words = [top_word.split("*")[1] for top_word in top_weighted]
+
+        numbers.append(str(number))
+        scores.append(float(score))
+        topics.append((top_words[0]+top_words[1]).replace('"', ''))
+
+    sents = {
+        'score': scores,
+        'topic': topics
+    }
+    df = pd.DataFrame(sents)
+    df = df.sort_values(by='score', ascending=False)
+    df['number'] = numbers
+    
+    return df
+
+def topics_bar(df):
+    topic_scores = alt.Chart(df).mark_bar().encode(
+        alt.X("score").title("Topic score"),
+        alt.Y("number").title("Topic number"),
+        tooltip=['topic:N']
+    ).properties(height=alt.Step(50))
+
+    st.subheader('Top 10 Topics')
+    st.altair_chart(topic_scores, use_container_width=True)
+    st.write('The figure above illustrates the distribution of topic weights derived from a Latent Dirichlet Allocation (LDA) model applied to movie review sentences. Each bar on the chart corresponds to a specific topic, labeled as "Topic 0," "Topic 1," "Topic 2.", and so on until "Topic 10". The height of each bar indicates the relative weight or prevalence of the respective topic within the entire corpus of movie reviews.')
 
 def show_pie_chart(poss, negs):
     # Pie chart
@@ -149,19 +217,6 @@ def show_pie_chart(poss, negs):
     st.pyplot(fig)
     st.write('This chart shows a comparison between the number of positive and negative reviews by percentage.')
 
-def show_bar_chart(poss, negs):
-    # Bar chart
-    fig, ax = plt.subplots()
-    ax.bar(['Positive', 'Negative'], [poss, negs], color=['blue', 'red'])
-
-    # Customize the plot
-    ax.set_title('Sentiments Comparison')
-    ax.set_ylabel('Number of Sentiments')
-
-    # Show the plot
-    st.pyplot(fig)
-    st.write('This chart shows a comparison between the number of positive and negative reviews based on their occurrence.')
-
 def rating_prediction(positivity):
     normalized_scores = [(score * 4) + 1 for score in (positivity)]
     average_score = sum(normalized_scores) / len(normalized_scores)
@@ -176,23 +231,26 @@ def display_analysis(sentences):
         st.write('there are currently no reviews for this')
         return
     
-    text = ' '.join(sentences)
     sentiments = analyze_sentiment(sentences)
-    df = get_df(sentences, sentiments)
-    label_count = df['label'].value_counts()
+    senti_df = get_senti_df(sentences, sentiments)
+
+    label_count = senti_df['label'].value_counts()
     poss = label_count.get('POSITIVE')
     negs = label_count.get('NEGATIVE')
 
-    rating_prediction(df['positivity'])
-    wordcloud, scatter, pie, bar = st.tabs(['Overview', 'Senti-plot', 'Distribution', 'Comparison'])
-    with wordcloud:    
+    rating_prediction(senti_df['positivity'])
+    wordcloud, scatter, bar, pie = st.tabs(['Overview', 'Senti-plot', 'Topics', 'Distribution'])
+    with wordcloud:
+        text = ' '.join(sentences)
         generate_wordcloud(extract_adj(text))
     with scatter:
-        show_scatter_plot(df)
+        senti_plot(senti_df)
+    with bar:
+        modelled_topics = model_topics(sentences)
+        topics_df = get_topics_df(modelled_topics)
+        topics_bar(topics_df)
     with pie:
         show_pie_chart(poss, negs)
-    with bar:
-        show_bar_chart(poss, negs)
 
 # Streamlit app
 def main():
@@ -200,13 +258,10 @@ def main():
     st.title('Movie Sentiment analysis')
 
     response = search_movie()
-    # Scraping elements
-    # print(response)
     try:
         suggestions = show_suggestions(response)
         selected_movie = pick_suggestion(suggestions)
         url = selected_movie[0]
-        # title = selected_movie[1]
         
         st.subheader('Overal Review From Critics and Audience')
 
