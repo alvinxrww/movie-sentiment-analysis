@@ -16,6 +16,7 @@ pandas = "*"
 gensim = "*"
 importlib-resources = "*"
 zipp = "*"
+numpy = "*"
 
 [dev-packages]
 
