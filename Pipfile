@@ -13,8 +13,10 @@ streamlit = "*"
 matplotlib = "*"
 altair = "*"
 pandas = "*"
-numpy = "*"
+gensim = "*"
 importlib-resources = "*"
+zipp = "*"
+numpy = "*"
 tensorflow = "*"
 
 [dev-packages]
