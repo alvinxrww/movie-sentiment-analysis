@@ -15,6 +15,7 @@ altair = "*"
 pandas = "*"
 gensim = "*"
 importlib-resources = "*"
+zipp = "*"
 
 [dev-packages]
 
