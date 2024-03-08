@@ -184,7 +184,11 @@ def model_topics(reviews):
     corpus = [dictionary.doc2bow(review) for review in processed_reviews]
 
     lda_model = models.LdaModel(
-        corpus, num_topics=10, id2word=dictionary, passes=15)
+        corpus,
+        num_topics=10,
+        id2word=dictionary,
+        passes=15
+    )
     modelled_topics = lda_model.print_topics(num_words=2)
 
     return modelled_topics
@@ -221,7 +225,7 @@ def topics_bar(df):
         alt.X("score").title("Topic score"),
         alt.Y("number").title("Topic number"),
         tooltip=[alt.Tooltip('topic:N', title='Topic: ')]
-    ).properties(height=alt.Step(50))
+    ).properties(height=alt.Step(40))
 
     st.subheader('Top 10 Topics')
     st.altair_chart(topic_scores, use_container_width=True)
@@ -242,15 +246,15 @@ def show_pie_chart(poss, negs):
     pie = alt.Chart(source).mark_arc().encode(
         theta="Count",
         color=alt.Color(
-            "Label", 
+            "Label",
             scale=alt.Scale(
-                domain=["Positive", "Negative"], 
+                domain=["Positive", "Negative"],
                 range=["#19c2fa", "#fc3f3f"]
             )),
         tooltip=["Label", "Count", "Percentage"]
     ).properties(
-        width=600,
-        height=600
+
+        height=480
     )
 
     st.subheader('Sentiments Distribution')
