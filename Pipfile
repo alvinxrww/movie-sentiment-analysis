@@ -17,6 +17,7 @@ gensim = "*"
 importlib-resources = "*"
 zipp = "*"
 numpy = "*"
+tensorflow = "*"
 
 [dev-packages]
 
