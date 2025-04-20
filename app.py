@@ -229,7 +229,7 @@ def topics_bar(df):
 
     st.subheader('Top 10 Topics')
     st.altair_chart(topic_scores, use_container_width=True)
-    st.write('The figure above illustrates the distribution of topic weights derived from a Latent Dirichlet Allocation (LDA) model applied to movie review sentences. Each bar on the chart corresponds to a specific topic, labeled as "Topic 0," "Topic 1," "Topic 2.", and so on until "Topic 10". The height of each bar indicates the relative weight or prevalence of the respective topic within the entire corpus of movie reviews.')
+    st.write('The figure above illustrates the distribution of topic weights derived from a Latent Dirichlet Allocation (LDA) model applied to movie review sentences. Each bar on the chart corresponds to a specific topic (which can be seen by hovering your mouse cursor to a specific bar), labeled as "Topic 0," "Topic 1," "Topic 2.", and so on until "Topic 10". The height of each bar indicates the relative weight or prevalence of the respective topic within the entire corpus of movie reviews.')
 
 
 def show_pie_chart(poss, negs):
